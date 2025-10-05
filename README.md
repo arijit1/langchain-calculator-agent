@@ -2,6 +2,22 @@
 
 A minimal **JavaScript (Node.js, ESM)** project demonstrating how **GPT-4o** can use a **LangChain tool** (a simple calculator) and later be extended into a **LangGraph agent loop**.
 
+## Console Output
+──────────────────────────────
+🚀 New Request
+──────────────────────────────
+💬 User: add 2 and 5
+🤖 Sending to GPT-4o (first turn)...
+🛠️ Model requested tool call(s):
+   #1 → name: calculator
+        id: call_nqqTCNBKO2PNF9CCw2r8cHor
+      args: { operation: 'add', a: 2, b: 5 }
+⚡ Running tool "calculator" with: { operation: 'add', a: 2, b: 5 }
+ADding
+🔙 Tool "calculator" result: 7
+📤 Sending tool result(s) back to model (second turn)...
+🟢 Final: 
+
 ---
 
 ## 🧰 Prerequisites
