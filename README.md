@@ -73,6 +73,7 @@ Add to `package.json`:
   "type": "module"
 }
 ```
+Directly Run -> Node langchain.mjs 
 
 ### 2️⃣ Create the Calculator Tool
 
