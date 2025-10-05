@@ -62,58 +62,68 @@ async function ask(prompt) {
   logDivider("🚀 New Request");
   console.log("💬 User:", prompt);
 
-  const history = [new HumanMessage(prompt)];
+  const messages = [new HumanMessage(prompt)];
 
   try {
     console.log("🤖 Sending to GPT-4o (first turn)...");
-    const first = await llm.invoke(history);
+    let ai = await llm.invoke(messages);
 
-    // Helpful raw dump while debugging:
-    // console.log("📥 First model response:", JSON.stringify(first, null, 2));
-
-    if (!first.tool_calls?.length) {
+    // If model already answered with no tools, we're done.
+    if (!ai.tool_calls?.length) {
       console.log("✅ No tool calls — model answered directly:");
-      console.log("🟢 Final:", first.content);
+      console.log("🟢 Final:", ai.content);
       return;
     }
 
     console.log("🛠️ Model requested tool call(s):");
-    logToolCalls(first.tool_calls);
+    logToolCalls(ai.tool_calls);
 
-    // Execute all requested tools and collect ToolMessages
-    const toolMsgs = await Promise.all(
-      first.tool_calls.map(async (call) => {
-        console.log(`⚡ Running tool "${call.name}" with:`, call.args);
+    // 🔁 Agent loop: run tools → send results → ask model again
+    while (ai.tool_calls?.length) {
+      const toolMsgs = await Promise.all(
+        ai.tool_calls.map(async (call) => {
+          console.log(`⚡ Running tool "${call.name}" with:`, call.args);
 
-        const tool = tools.find((t) => t.name === call.name);
-        if (!tool) {
-          console.warn(`❗ No matching tool found for "${call.name}". Skipping.`);
+          const tool = tools.find((t) => t.name === call.name);
+          if (!tool) {
+            console.warn(`❗ No matching tool found for "${call.name}". Skipping.`);
+            return new ToolMessage({
+              tool_call_id: call.id,
+              name: call.name,
+              content: "Tool not found",
+            });
+          }
+
+          const result = await tool.invoke(call.args);
+          console.log(`🔙 Tool "${call.name}" result:`, result);
+
           return new ToolMessage({
-            tool_call_id: call.id,
+            tool_call_id: call.id, // REQUIRED
             name: call.name,
-            content: "Tool not found",
+            content: String(result),
           });
-        }
+        })
+      );
 
-        const result = await tool.invoke(call.args);
-        console.log(`🔙 Tool "${call.name}" result:`, result);
+      console.log("📤 Sending tool result(s) back to model...");
+      messages.push(ai, ...toolMsgs);
 
-        return new ToolMessage({
-          tool_call_id: call.id, // 🔴 REQUIRED for tool replies
-          name: call.name,
-          content: String(result),
-        });
-      })
-    );
+      // 👉 do NOT force tools here; let the model decide to finish or ask again
+      ai = await llm.invoke(messages);
 
-    console.log("📤 Sending tool result(s) back to model (second turn)...");
-    const final = await llm.invoke([...history, first, ...toolMsgs]);
+      // If more tool calls requested, log them before next loop iteration
+      if (ai.tool_calls?.length) {
+        console.log("🛠️ Model requested additional tool call(s):");
+        logToolCalls(ai.tool_calls);
+      }
+    }
 
-    console.log("🟢 Final:", final.content);
+    console.log("🟢 Final:", ai.content);
   } catch (err) {
     console.error("💥 Error in ask():", err?.message || err);
   }
 }
+
 
 /**
  * ──────────────────────────────────────────────────────────────────────────────
